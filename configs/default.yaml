@@ -15,11 +15,9 @@ retrieval:
 
 # ── Tracking ─────────────────────────────────────────────────────────────────
 tracking:
-  n_particles: 1000
   use_VO: false
   use_odometry: true
   new_kf_after_n_unsuccessful_steps: 5
-  use_particles: false
   odom_std_per_meter: 0.5
   odom_std_per_radian: 0.5
   odom_min_std_translation: 0.1
@@ -36,7 +34,6 @@ mapping:
   kf_retrieval_threshold_new_kf: 0.75
   kf_match_threshold_new_kf: 50
   new_component_weight_threshold: 0.2
-  no_pgo_for_lc: false
 
   loop_closure:
     async: false
@@ -65,7 +62,6 @@ mapping:
     realize_hitrate_thresh: 0.4
     death_ttl_base: 4
     death_ttl_gain: 4.0
-    boost_min_hitrate: 0.4
     ttl_sum_thresh: 0.25
     ttl_hitrate_thresh: 0.4
     death_ttl_max: 20
@@ -95,7 +91,6 @@ mapping:
 
 # ── PGO ──────────────────────────────────────────────────────────────────────
 pgo:
-  solver: gtsam         # gtsam | pypose
   std_reduction_factor: 0.3
   visual_robust_enabled: true
   visual_robust_type: huber   # huber | cauchy | tukey
@@ -130,6 +125,5 @@ visualization:
   visualize_camera: true
   visualize_pinhole_camera: false
   visualize_keyframe_gmm_trajectory: true
-  visualize_particles: true
   visualize_hypotheses: true
   visualize_odom_trajectory: true

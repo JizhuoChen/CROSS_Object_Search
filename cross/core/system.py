@@ -23,8 +23,6 @@ import sys
 from cross.db.db import KeyframeDatabase
 from cross.utils.probabilities import (
     convolve_gmm_batch_SE3,
-    sample_gmm_torch_vectorized_SE3,
-    torch_multivariate_normal_pdf,
 )
 import pypose as pp
 from cross.visualization.viz_rr import RRViz
@@ -135,13 +133,9 @@ class System:
             self.odom_accumulator.register_item("since_last_retrieval")
 
         self.use_VO = self.config.tracking.use_VO
-        self.use_particles = self.config.tracking.use_particles
         # Retrieval filtering mode configuration
         self.filter_mode = self.config.tracking.filter_mode
         self.adaptive_filter_cfg = self.config.tracking.adaptive_filter
-        if self.use_particles:
-            self.n_particles = self.config.tracking.n_particles
-            self.particles = {"poses": None, "weights": None}
 
         self._unsuccessful_retrieval_steps = 0
 
@@ -325,15 +319,6 @@ class System:
 
         self.hypothesis_manager.dist = (mu.to(self.device), sigma.to(self.device), weights.to(self.device))
 
-        # init the particles
-        if self.use_particles:
-            poses = mu[0].repeat(self.n_particles, 1)
-            # initialize particles
-            self.particles = {
-                "poses": poses,
-                "weights": torch.ones(self.n_particles, device=self.storage_device) / self.n_particles,
-            }
-
         # insert the initial keyframe
         kf = self.db.insert(
             self._processed_frame_num,
@@ -472,7 +457,7 @@ class System:
         - class variables for ID tracking
         - system config
 
-        Tracking state (GMM dist, particles, metadata) is NOT saved.
+        Tracking state (GMM dist, metadata) is NOT saved.
         A new session will re-initialize tracking state on the first step.
         """
 
@@ -526,7 +511,7 @@ class System:
         Tracking state is NOT loaded and remains uninitialized (dist=None).
         On the first step() call after loading, _init_system() will:
         - Create a new keyframe at an estimated starting pose
-        - Initialize tracking state (GMM dist, particles, etc.)
+        - Initialize tracking state (GMM dist, etc.)
         - If robot is in a previously visited area, loop closure will merge trajectories
         """
         load_path = os.path.join(os.getcwd(), load_path)
@@ -748,7 +733,7 @@ class System:
             if self.visualize:
                 self.visualizer.reset(new_session=False)
 
-            # Re-initialize system (GMM dist, particles, new keyframe)
+            # Re-initialize system (GMM dist, new keyframe)
             kf = self._init_system(rgb_image, depth_image, timestamp=timestamp)
             if self.visualize:
                 self.visualizer.visualize_tracking_step(
@@ -815,38 +800,6 @@ class System:
             pose_update_mask=pose_update_mask,
         )
         current_mu, current_sigma, current_weights = self.hypothesis_manager.dist
-        
-        #########################################################
-        # Particle filtering
-        # first sample from the merged proposal GMM
-        # then update the particles with the motion model if available
-        # then resample the particles
-        #########################################################
-        if self.use_particles:
-            new_poses = sample_gmm_torch_vectorized_SE3(
-                n_samples=self.n_particles,
-                weights=proposal_gmm_weights,
-                means=proposal_gmm_mu,
-                stds=proposal_gmm_sigma,
-            )
-            # update the particles with the motion model if available
-            if ret["delta_pose"] is not None:
-                weights = self._update_weights_with_motion_model(
-                    old_poses=self.particles["poses"],
-                    new_poses=new_poses,
-                    delta_pose=ret["delta_pose"],
-                    motion_std_diag=ret["delta_std"],
-                )
-                # resample the particles
-                new_poses_updated, weights = self._resample_particles(new_poses, weights)
-
-            else:
-                new_poses_updated = new_poses
-                weights = torch.ones(self.n_particles, device=self.device) / self.n_particles
-
-            self.particles = {"poses": new_poses_updated, "weights": weights}
-            ret['particle_poses'] = new_poses_updated
-            ret['particle_poses_before_update'] = new_poses
 
         ret['current_mu'] = current_mu
         ret['current_sigma'] = current_sigma
@@ -1466,99 +1419,3 @@ class System:
         """
         return weights / weights.sum()
 
-    def _update_weights_with_motion_model(
-        self, 
-        old_poses: pp.LieTensor, 
-        new_poses: pp.LieTensor, 
-        delta_pose: pp.LieTensor,
-        motion_std_diag: pp.LieTensor = None,
-        confidence: float = 0.9
-    ) -> torch.Tensor:
-        """Updates particle weights according to the motion model, 
-        Calculates w_t ∝ w_{t-1} * p(x_t | x_{t-1}).
-        As we resample the particles, the old weights are always reset to 1/N.
-        So we can ignore it.
-        Args:
-            old_poses: (N, 7)
-            new_poses: (N, 7)
-            delta_pose: (7,)
-            motion_std_diag: (6,)
-        Returns:
-            final_weights: (N,)
-        """
-        # The motion model p(x_t | x_{t-1}) is a Gaussian centered at x_{t-1} @ delta_pose
-        # We want to evaluate the probability of the new pose x_t under this Gaussian.
-        
-        # The mean of the distribution for particle i is:
-        predicted_means = old_poses.to(self.device) @ delta_pose.unsqueeze(0).to(self.device)
-        
-        # The difference vector in the tangent space is:
-        # diff = x_t relative to predicted_mean
-        diff_vecs = (predicted_means.Inv() @ new_poses.to(self.device)).Log().tensor()
-        
-        motion_likelihoods = torch_multivariate_normal_pdf(diff_vecs, motion_std_diag.tensor().to(self.device)) * confidence
-
-        # add "jump uniform likelihood"
-        jump_uniform_likelihood = 1e-1
-        motion_likelihoods = motion_likelihoods + (1 - confidence) * jump_uniform_likelihood
-        
-        # Normalize
-        total_weight = torch.sum(motion_likelihoods)
-        if total_weight > 1e-9:
-            final_weights = motion_likelihoods / total_weight
-        else:
-            logger.warning("All particle weights dropped to zero after motion check. Resetting.")
-            final_weights = torch.full((len(old_poses),), 1.0 / len(old_poses), device=self.device)
-            
-        return final_weights
-
-    def _resample_particles(
-        self,
-        poses: pp.LieTensor,
-        weights: torch.Tensor,
-    ) -> Tuple[pp.LieTensor, torch.Tensor]:
-        """Performs Systematic Resampling to generate a new, unweighted particle set.
-
-        This low-variance method ensures that the number of offspring for each
-        particle is more deterministic and proportional to its weight, which
-        improves filter stability compared to multinomial resampling.
-
-        Args:
-            poses (pp.LieTensor): The set of poses for all N particles. Shape: (N, 7).
-            weights (torch.Tensor): The importance weights for each particle. Shape: (N,).
-                                    Must sum to 1.
-
-        Returns:
-            Tuple[pp.LieTensor, torch.Tensor]:
-                - new_poses (pp.LieTensor): The resampled set of poses. Shape: (N, 7).
-                - new_weights (torch.Tensor): The new uniform weights. Shape: (N,).
-        """
-        device = poses.device
-        n_particles = poses.shape[0]
-
-        # 1. Calculate the cumulative distribution function (CDF) of the weights.
-        # This creates the "bins" for each particle on a [0, 1] line.
-        cdf = torch.cumsum(weights, dim=0)
-
-        # 2. Generate a single random starting point for the "comb".
-        # This point is chosen from the first stratum [0, 1/N).
-        start_point = torch.rand(1, device=device) / n_particles
-
-        # 3. Create the stratified pointers for the comb.
-        # These are N equally spaced points starting from the random start point.
-        pointers = start_point + torch.arange(n_particles, device=device) / n_particles
-
-        # 4. Find which bin each pointer falls into.
-        # torch.searchsorted is a highly efficient, vectorized way to do this lookup.
-        # It finds the indices where the pointers would be inserted into the CDF to
-        # maintain order, which is equivalent to finding the particle they belong to.
-        indices = torch.searchsorted(cdf, pointers).clamp(max=n_particles-1)
-
-        # 5. Create the new particle set by cloning the selected particles.
-        assert torch.all((indices >= 0) & (indices < len(poses))), "Indices out of bounds"
-        new_poses = poses[indices]
-
-        # 6. The new weights are uniform.
-        new_weights = torch.full((n_particles,), 1.0 / n_particles, device=device)
-
-        return new_poses, new_weights

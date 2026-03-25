@@ -189,7 +189,6 @@ class HypothesisManager:
         # ========== Death (Tracking → Free) ==========
         self.death_ttl_base = cfg.death_ttl_base
         self.death_ttl_gain = cfg.death_ttl_gain
-        self.boost_min_hitrate = cfg.boost_min_hitrate
         self.ttl_sum_thresh = cfg.ttl_sum_thresh
         self.ttl_hitrate_thresh = cfg.ttl_hitrate_thresh
         self.death_ttl_max = cfg.death_ttl_max

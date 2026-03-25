@@ -80,10 +80,10 @@ class PoseGraph:
         # Robust kernel settings for visual edges (read from system config if available)
         system = getattr(hypothesis_manager, "system", None)
         if system is not None and hasattr(system, "config"):
-            pgo_cfg = system.config.get("pgo", {})
-            self.visual_robust_enabled = pgo_cfg.get("visual_robust_enabled", True)
-            self.visual_robust_type = pgo_cfg.get("visual_robust_type", "huber")
-            self.visual_robust_delta = float(pgo_cfg.get("visual_robust_delta", 1.0))
+            pgo_cfg = system.config.pgo
+            self.visual_robust_enabled = pgo_cfg.visual_robust_enabled
+            self.visual_robust_type = pgo_cfg.visual_robust_type.value if hasattr(pgo_cfg.visual_robust_type, "value") else pgo_cfg.visual_robust_type
+            self.visual_robust_delta = float(pgo_cfg.visual_robust_delta)
 
         # Constructed graph structure (filled by construct methods)
         self.vertices: List[Vertex] = []

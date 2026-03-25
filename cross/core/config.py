@@ -59,11 +59,6 @@ class VPRModelType(str, Enum):
     BOQ = "boq"
 
 
-class PGOSolver(str, Enum):
-    GTSAM = "gtsam"
-    PYPOSE = "pypose"
-
-
 class RobustKernelType(str, Enum):
     HUBER = "huber"
     CAUCHY = "cauchy"
@@ -82,11 +77,9 @@ class AdaptiveFilterConfig:
 
 @dataclass
 class TrackingConfig:
-    n_particles: int = 1000
     use_VO: bool = False
     use_odometry: bool = True
     new_kf_after_n_unsuccessful_steps: int = 5
-    use_particles: bool = False
     odom_std_per_meter: float = 0.5
     odom_std_per_radian: float = 0.5
     odom_min_std_translation: float = 0.1
@@ -148,7 +141,6 @@ class HypothesisConfig:
     # --- Death: Tracking → Free ---
     death_ttl_base: int = 4
     death_ttl_gain: float = 4.0
-    boost_min_hitrate: float = 0.4
     ttl_sum_thresh: float = 0.25
     ttl_hitrate_thresh: float = 0.4
     death_ttl_max: int = 20
@@ -197,7 +189,6 @@ class MappingConfig:
     kf_retrieval_threshold_new_kf: float = 0.75
     kf_match_threshold_new_kf: int = 50
     new_component_weight_threshold: float = 0.2
-    no_pgo_for_lc: bool = False
     loop_closure: LoopClosureConfig = field(default_factory=LoopClosureConfig)
     local_smoothing: LocalSmoothingConfig = field(default_factory=LocalSmoothingConfig)
     cluster_std: ClusterStdConfig = field(default_factory=ClusterStdConfig)
@@ -207,7 +198,6 @@ class MappingConfig:
 
 @dataclass
 class PGOConfig:
-    solver: PGOSolver = PGOSolver.GTSAM
     std_reduction_factor: float = 0.3
     visual_robust_enabled: bool = True
     visual_robust_type: RobustKernelType = RobustKernelType.HUBER
@@ -253,7 +243,6 @@ class VisualizationConfig:
     visualize_camera: bool = True
     visualize_pinhole_camera: bool = False
     visualize_keyframe_gmm_trajectory: bool = True
-    visualize_particles: bool = True
     visualize_hypotheses: bool = True
     visualize_odom_trajectory: bool = True
 

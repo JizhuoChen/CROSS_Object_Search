@@ -3,7 +3,6 @@ import rerun as rr
 from typing import Optional, Dict, Any, List, Union
 
 import torch
-from cross.utils.probabilities import sample_gmm_torch_vectorized_SE3
 from cross.core.types import Keyframe, Camera
 from cross.core.config import VisualizationConfig
 from collections import defaultdict
@@ -74,7 +73,6 @@ class RRViz:
         self.visualize_current_gmm_state = kwargs.get('visualize_current_gmm_state', vcfg.visualize_current_gmm_state)
         self.visualize_keyframe_gmms = kwargs.get('visualize_keyframe_gmms', vcfg.visualize_keyframe_gmms)
         self.visualize_system_data = kwargs.get('visualize_system_data', vcfg.visualize_system_data)
-        self.visualize_particles = kwargs.get('visualize_particles', vcfg.visualize_particles)
         self.visualize_hypotheses = kwargs.get('visualize_hypotheses', vcfg.visualize_hypotheses)
         self.visualize_trajectory = kwargs.get('visualize_trajectory', vcfg.visualize_trajectory)
         self.visualize_odom_trajectory = kwargs.get('visualize_odom_trajectory', vcfg.visualize_odom_trajectory)
@@ -921,66 +919,6 @@ class RRViz:
                         )
                     )
 
-    def _visualize_particles(self, state_info: Dict[str, Any]):
-        """Visualize particles as 3D points showing their translation components."""
-        n_particles = 1000
-        if state_info and "current_mu" in state_info:
-            current_mu = state_info["current_mu"]
-            current_sigma = state_info["current_sigma"]
-            current_weights = state_info["current_weights"]
-
-            # sample particles
-            particle_poses = sample_gmm_torch_vectorized_SE3(
-                n_samples=n_particles,
-                weights=current_weights,
-                means=current_mu,
-                stds=current_sigma,
-            )
-            positions = particle_poses.tensor()[:, :3].cpu().numpy()  # (N, 3)
-            n_particles = len(positions)
-            particle_colors = np.tile([255, 165, 0], (n_particles, 1))  # Orange color
-            
-            # Log particles as points
-            rr.log(
-                "world/particles_filtered",
-                rr.Points3D(
-                    positions=positions,
-                    colors=particle_colors.astype(np.uint8),
-                    radii=0.02  # Small radius for particle points
-                )
-            )
-            
-        if state_info and "proposal_mu" in state_info:
-            proposal_mu = state_info["proposal_mu"]
-            proposal_sigma = state_info["proposal_sigma"]
-            proposal_weights = state_info["proposal_weights"].clone()
-
-            # remove components with infinite sigma, which is "imaginary"
-            infi_sigma = proposal_sigma.min(dim=-1).values > 1e3
-            proposal_weights[infi_sigma] = 0.0
-
-            # sample particles
-            proposal_poses = sample_gmm_torch_vectorized_SE3(
-                n_samples=n_particles,
-                weights=proposal_weights,
-                means=proposal_mu,
-                stds=proposal_sigma,
-            )
-            positions = proposal_poses.tensor()[:, :3].cpu().numpy()
-            # Create colors for particles - use orange to distinguish from other elements
-            n_particles = len(positions)
-            particle_colors = np.tile([0, 255, 0], (n_particles, 1))  # Green color
-            
-            # Log particles as points
-            rr.log(
-                "world/particles_proposal",
-                rr.Points3D(
-                    positions=positions,
-                    colors=particle_colors.astype(np.uint8),
-                    radii=0.02  # Small radius for particle points
-                )
-            )
-                
 
     def set_hypothesis_manager(self, hypothesis_manager: HypothesisManager):
         """Update the hypothesis manager reference.
@@ -1094,10 +1032,6 @@ class RRViz:
         if self.visualize_hypotheses:
             self._visualize_hypo_dict(state_info)
         
-        # # Visualize particles
-        # if self.visualize_particles:
-        #     self._visualize_particles(state_info)
-
         # Mark kidnapping boundary after all processing
         if is_kidnapped_frame:
             self.kidnapped_kf_ids.add(kf.id)
