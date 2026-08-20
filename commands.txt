@@ -1,0 +1,34 @@
+conda activate spot
+
+# Record a sequence:
+python scripts/record_stretch_stream.py \
+  --robot-ip 192.168.0.102 \
+  --out-dir recordings/object_search/seq_1 \
+  --sequence-id new_test_01 \
+  --role testing \
+  --record-fps 4 \
+  --conflate
+
+
+# Visualize a recording (RGB):
+python -c '                               
+import cv2
+from fats.dataloader.stretch_recording import StretchRecording
+
+recording = StretchRecording(
+    "recordings/stretch_ablation/day_map_02",
+    rgb_decode="opencv_rgb_array_as_bgr_v1",
+)
+
+for frame in recording:
+    image = cv2.cvtColor(frame["rgb"], cv2.COLOR_RGB2BGR)
+    label = "Frame {}".format(frame["frame_index"])
+    cv2.putText(image, label, (15, 35),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    cv2.imshow("Stretch recording - Q/Esc to quit", image)
+
+    if cv2.waitKey(250) & 0xFF in (ord("q"), 27):
+        break
+
+cv2.destroyAllWindows()
+'
