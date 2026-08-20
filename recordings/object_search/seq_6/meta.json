@@ -1,0 +1,96 @@
+{
+  "args": {
+    "conflate": true,
+    "duration_sec": -1.0,
+    "local": false,
+    "max_frames": -1,
+    "out_dir": "recordings/object_search/seq_6",
+    "overwrite": false,
+    "record_fps": 4.0,
+    "recv_port": 4401,
+    "robot_ip": "192.168.0.102",
+    "role": "mapping",
+    "sequence_id": "seq_6",
+    "startup_timeout_sec": 15.0,
+    "status_every": 50,
+    "stop_file": "",
+    "timeout_ms": 2000
+  },
+  "created_utc": "2026-08-20T11:18:48.434263+00:00",
+  "dropped_count": 0,
+  "duration_sec": 91.54614067077637,
+  "finished_utc": "2026-08-20T11:20:19.980405+00:00",
+  "format_version": 1,
+  "frame_count": 285,
+  "frame_files_pattern": "frames/%08d.npz",
+  "producer": "CROSS/scripts/record_stretch_stream.py",
+  "received_count": 808,
+  "received_fps_effective": 8.826150333368801,
+  "role": "mapping",
+  "saved_fps_effective": 3.113184214121421,
+  "sequence_id": "seq_6",
+  "sequence_role": "mapping",
+  "skipped_rate_count": 523,
+  "source_addr": "tcp://192.168.0.102:4401",
+  "startup_probe": {
+    "bridge_action_step": 3,
+    "camera_K": [
+      [
+        606.1235961914062,
+        0.0,
+        247.56045532226562
+      ],
+      [
+        0.0,
+        606.080078125,
+        325.16796875
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "camera_pose_present": true,
+    "depth_decoded_dtype": "uint16",
+    "message_keys": [
+      "at_goal",
+      "camera_K",
+      "camera_pose",
+      "compass",
+      "depth",
+      "ee_pose",
+      "gps",
+      "joint",
+      "joint_velocities",
+      "last_motion_failed",
+      "lidar_gate",
+      "lidar_points",
+      "lidar_skip_fusion",
+      "lidar_timestamp",
+      "pose_graph",
+      "recv_address",
+      "rgb",
+      "rgb_height",
+      "rgb_width",
+      "step"
+    ],
+    "rejected_packet_count": 0,
+    "rgb_decoded_dtype": "uint8",
+    "rgb_height": 640,
+    "rgb_width": 480,
+    "waited_sec": 0.0777875802014023
+  },
+  "state": "interrupted",
+  "stop_reason": "signal_2",
+  "stream": {
+    "conflate": true,
+    "depth_encoding": "jpeg2000",
+    "depth_storage_unit": "millimetre",
+    "publisher_step_key": "step",
+    "publisher_step_semantics": "last_bridge_action_id_not_frame_counter",
+    "record_fps": 4.0,
+    "recv_time_clock": "unix_wall_seconds_at_recorder",
+    "rgb_encoding": "jpeg"
+  }
+}
